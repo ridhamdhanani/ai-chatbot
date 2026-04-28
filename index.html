@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        body { margin:0; font-family:Arial; background:#343541; color:white; }
+
+        .app { display:flex; height:100vh; }
+
+        .sidebar {
+            width:240px;
+            background:#202123;
+            padding:10px;
+        }
+
+        .chat-item {
+            padding:8px;
+            cursor:pointer;
+            display:flex;
+            justify-content:space-between;
+        }
+
+        .chat-item:hover { background:#2a2b32; }
+
+        .main { flex:1; display:flex; flex-direction:column; }
+
+        .chat-box {
+            flex:1;
+            padding:20px;
+            overflow-y:auto;
+        }
+
+        .row { display:flex; margin:8px 0; }
+
+        .user { justify-content:flex-end; }
+        .bot { justify-content:flex-start; }
+
+        .msg {
+            max-width:60%;
+            padding:12px;
+            border-radius:10px;
+        }
+
+        .user .msg { background:#3b82f6; }
+        .bot .msg { background:#444654; }
+
+        .avatar {
+            width:30px;
+            height:30px;
+            border-radius:50%;
+            margin:0 8px;
+        }
+
+        .input-area {
+            display:flex;
+            padding:10px;
+            background:#40414f;
+        }
+
+        input {
+            padding:10px;
+            margin:5px;
+            border:none;
+            border-radius:6px;
+            outline:none;
+        }
+
+        button {
+            padding:10px;
+            margin:5px;
+            background:#10a37f;
+            border:none;
+            border-radius:6px;
+            color:white;
+            cursor:pointer;
+        }
+
+        /* LOGIN SCREEN */
+        #loginBox {
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%, -50%);
+            background:#202123;
+            padding:20px;
+            border-radius:10px;
+            display:flex;
+            flex-direction:column;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- 🔐 LOGIN -->
+<div id="loginBox">
+    <h3>Login</h3>
+    <input id="username" placeholder="Username">
+    <input id="password" placeholder="Password" type="password">
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Register</button>
+</div>
+
+<div class="app" id="app" style="display:none;">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <button onclick="newChat()">+ New</button>
+        <div id="list"></div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+        <div id="chat" class="chat-box"></div>
+
+        <div class="input-area">
+            <input id="input" placeholder="Send a message..." />
+            <button onclick="send()">Send</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+let token = localStorage.getItem("token");
+
+function showChat() {
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+}
+
+if (token) showChat();
+
+async function login() {
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: username.value,
+            password: password.value
+        })
+    });
+
+    const data = await res.json();
+
+    if (data.token) {
+        token = data.token;
+        localStorage.setItem("token", token);
+        showChat();
+    } else {
+        alert("Invalid login");
+    }
+}
+
+async function register() {
+    const res = await fetch("/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: username.value,
+            password: password.value
+        })
+    });
+
+    const data = await res.json();
+    alert(data.status);
+}
+
+/* CHAT SYSTEM */
+
+let chats = {};
+let sessionId = null;
+
+function newChat(){
+    sessionId = Math.random().toString(36).slice(2);
+    chats[sessionId] = { title: "New Chat", messages: [] };
+    render();
+}
+
+function render(){
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    Object.keys(chats).forEach(id => {
+        const d = document.createElement("div");
+        d.className = "chat-item";
+
+        d.innerHTML = `
+            <span onclick="load('${id}')">${chats[id].title}</span>
+            <span onclick="deleteChat('${id}')">❌</span>
+        `;
+
+        list.appendChild(d);
+    });
+}
+
+function deleteChat(id){
+    delete chats[id];
+    render();
+}
+
+function load(id){
+    sessionId = id;
+    chat.innerHTML = "";
+    chats[id].messages.forEach(m => add(m.text, m.role, false));
+}
+
+function add(text, role, saveMsg=true){
+    const row = document.createElement("div");
+    row.className = "row " + role;
+
+    const avatar = document.createElement("img");
+    avatar.className = "avatar";
+    avatar.src = role === "user"
+        ? "https://i.imgur.com/1Xq9BiP.png"
+        : "https://i.imgur.com/7k12EPD.png";
+
+    const msg = document.createElement("div");
+    msg.className = "msg";
+    msg.innerHTML = marked.parse(text);
+
+    if (role === "bot") {
+        row.appendChild(avatar);
+        row.appendChild(msg);
+    } else {
+        row.appendChild(msg);
+        row.appendChild(avatar);
+    }
+
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+
+    if (saveMsg) {
+        chats[sessionId].messages.push({ text, role });
+    }
+
+    return msg;
+}
+
+async function send(){
+    const input = document.getElementById("input");
+    if (!input.value) return;
+
+    if (!sessionId) newChat();
+
+    add(input.value, "user");
+    const bot = add("...", "bot");
+
+    const res = await fetch(
+        `/chat?q=${encodeURIComponent(input.value)}&session_id=${sessionId}&token=${token}`
+    );
+
+    const title = res.headers.get("X-Chat-Title");
+    if (title) {
+        chats[sessionId].title = title;
+        render();
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    let result = "";
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        result += decoder.decode(value);
+        bot.innerHTML = marked.parse(result);
+    }
+
+    chats[sessionId].messages[chats[sessionId].messages.length - 1].text = result;
+
+    input.value = "";
+}
+
+document.getElementById("input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send();
+    }
+});
+</script>
+
+</body>
+</html>

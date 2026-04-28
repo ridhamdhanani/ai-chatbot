@@ -1,0 +1,8 @@
+openai
+requests
+beautifulsoup4
+fastapi
+uvicorn
+python-dotenv
+beautifulsoup4
+requests
