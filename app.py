@@ -7,6 +7,8 @@ from auth import hash_password, verify_password, create_token, decode_token
 from search import build_context
 from llm import stream_chat, should_search, generate_title
 
+import os
+
 app = FastAPI()
 
 app.add_middleware(
@@ -17,9 +19,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 @app.get("/")
 def serve_ui():
-    return FileResponse("index.html")
+    return FileResponse(os.path.join(BASE_DIR, "index.html"))
 
 
 # 🔐 REGISTER
@@ -29,7 +34,7 @@ def register(data: dict):
     password = hash_password(data["password"])
 
     if not create_user(username, password):
-        raise HTTPException(status_code=400, detail="User already exists")
+        raise HTTPException(status_code=400, detail="User exists")
 
     return {"status": "ok"}
 
@@ -41,17 +46,14 @@ def login(data: dict):
     password = data["password"]
 
     user = get_user(username)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    if not verify_password(password, user[0]):
+    if not user or not verify_password(password, user[0]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token(username)
     return {"token": token}
 
 
-# 💬 CHAT (PROTECTED)
+# 💬 CHAT (SSE STREAMING)
 @app.get("/chat")
 def chat(q: str, session_id: str, token: str):
 
@@ -70,7 +72,7 @@ def chat(q: str, session_id: str, token: str):
 
     context = build_context(q) if should_search(q) else None
 
-    def generate():
+    def event_stream():
         stream = stream_chat(history, context)
         full = ""
 
@@ -78,13 +80,17 @@ def chat(q: str, session_id: str, token: str):
             delta = chunk.choices[0].delta.content
             if delta:
                 full += delta
-                yield delta
+                yield f"data: {delta}\n\n"
 
         save_message(username, session_id, "assistant", full)
 
-    headers = {}
+    headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no"
+    }
+
     if title:
         safe_title = title.encode("ascii", "ignore").decode()
         headers["X-Chat-Title"] = safe_title
 
-    return StreamingResponse(generate(), media_type="text/plain", headers=headers)
+    return StreamingResponse(event_stream(), media_type="text/event-stream", headers=headers)

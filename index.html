@@ -281,11 +281,11 @@ async function send(){
     if (!sessionId) newChat();
 
     add(input.value, "user");
-    const bot = add("...", "bot");
+    const bot = add("", "bot");
 
-    const res = await fetch(
-        `/chat?q=${encodeURIComponent(input.value)}&session_id=${sessionId}&token=${token}`
-    );
+    const url = `/chat?q=${encodeURIComponent(input.value)}&session_id=${sessionId}&token=${token}`;
+
+    const res = await fetch(url);
 
     const title = res.headers.get("X-Chat-Title");
     if (title) {
@@ -302,8 +302,18 @@ async function send(){
         const { done, value } = await reader.read();
         if (done) break;
 
-        result += decoder.decode(value);
-        bot.innerHTML = marked.parse(result);
+        const chunk = decoder.decode(value);
+
+        // 🔥 SSE format parsing
+        const lines = chunk.split("\n");
+
+        for (let line of lines) {
+            if (line.startsWith("data: ")) {
+                const text = line.replace("data: ", "");
+                result += text;
+                bot.innerHTML = marked.parse(result);
+            }
+        }
     }
 
     chats[sessionId].messages[chats[sessionId].messages.length - 1].text = result;
