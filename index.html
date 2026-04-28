@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AI Chat</title>
+    <title>JustChat</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
@@ -41,22 +41,31 @@
             overflow-y:auto;
         }
 
-        .row { display:flex; margin:10px 0; }
+        .row { display:flex; margin:12px 0; }
 
         .user { justify-content:flex-end; }
         .bot { justify-content:flex-start; }
 
         .msg {
-            max-width:60%;
-            padding:12px;
-            border-radius:12px;
-            line-height:1.5;
+            max-width:65%;
+            padding:14px;
+            border-radius:14px;
+            line-height:1.6;
+            font-size:14px;
         }
 
         .user .msg { background:#3b82f6; }
         .bot .msg { background:#444654; }
 
-        /* 🔥 CLEAN AVATARS */
+        /* Markdown improvements */
+        .msg p { margin: 6px 0; }
+        .msg ul { margin: 6px 0 6px 18px; }
+        .msg code {
+            background:#222;
+            padding:2px 6px;
+            border-radius:4px;
+        }
+
         .avatar {
             width:32px;
             height:32px;
@@ -67,16 +76,10 @@
             font-size:12px;
             font-weight:bold;
             margin:0 8px;
-            flex-shrink:0;
         }
 
-        .user .avatar {
-            background:#3b82f6;
-        }
-
-        .bot .avatar {
-            background:#10a37f;
-        }
+        .user .avatar { background:#3b82f6; }
+        .bot .avatar { background:#10a37f; }
 
         .input-area {
             display:flex;
@@ -102,6 +105,11 @@
             cursor:pointer;
         }
 
+        .typing-text {
+            font-style: italic;
+            opacity: 0.7;
+        }
+
         #loginBox {
             position:absolute;
             top:50%;
@@ -122,7 +130,6 @@
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginBox">
     <h3>Login</h3>
     <input id="username" placeholder="Username">
@@ -141,7 +148,7 @@
     <div class="main">
 
         <div class="topbar">
-            <div>AI Chatbot</div>
+            <div><strong>JustChat</strong></div>
             <button onclick="logout()">Logout</button>
         </div>
 
@@ -160,13 +167,13 @@
 let token = localStorage.getItem("token");
 
 function showChat() {
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("app").style.display = "flex";
+    loginBox.style.display = "none";
+    app.style.display = "flex";
 }
 
 function showLogin() {
-    document.getElementById("loginBox").style.display = "flex";
-    document.getElementById("app").style.display = "none";
+    loginBox.style.display = "flex";
+    app.style.display = "none";
 }
 
 if (token) showChat();
@@ -176,8 +183,6 @@ function logout() {
     token = null;
     showLogin();
 }
-
-/* AUTH */
 
 async function login() {
     const res = await fetch("/login", {
@@ -195,13 +200,11 @@ async function login() {
         token = data.token;
         localStorage.setItem("token", token);
         showChat();
-    } else {
-        alert("Invalid login");
     }
 }
 
 async function register() {
-    const res = await fetch("/register", {
+    await fetch("/register", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
@@ -209,12 +212,7 @@ async function register() {
             password: password.value
         })
     });
-
-    const data = await res.json();
-    alert(data.status || data.detail);
 }
-
-/* CHAT */
 
 let chats = {};
 let sessionId = null;
@@ -226,25 +224,13 @@ function newChat(){
 }
 
 function render(){
-    const list = document.getElementById("list");
     list.innerHTML = "";
-
     Object.keys(chats).forEach(id => {
         const d = document.createElement("div");
         d.className = "chat-item";
-
-        d.innerHTML = `
-            <span onclick="load('${id}')">${chats[id].title}</span>
-            <span onclick="deleteChat('${id}')">❌</span>
-        `;
-
+        d.innerHTML = `<span onclick="load('${id}')">${chats[id].title}</span>`;
         list.appendChild(d);
     });
-}
-
-function deleteChat(id){
-    delete chats[id];
-    render();
 }
 
 function load(id){
@@ -276,9 +262,7 @@ function add(text, role, saveMsg=true){
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
 
-    if (saveMsg) {
-        chats[sessionId].messages.push({ text, role });
-    }
+    if (saveMsg) chats[sessionId].messages.push({ text, role });
 
     return msg;
 }
@@ -290,23 +274,14 @@ async function send(){
     if (!sessionId) newChat();
 
     const userText = input.value;
-
     input.value = "";
     input.focus();
 
     add(userText, "user");
 
-    const bot = add('<div class="typing-text">Buddy is typing</div>', "bot");
+    const bot = add('<div class="typing-text">thinking...</div>', "bot");
 
-    const res = await fetch(
-        `/chat?q=${encodeURIComponent(userText)}&session_id=${sessionId}&token=${token}`
-    );
-
-    const title = res.headers.get("X-Chat-Title");
-    if (title) {
-        chats[sessionId].title = title;
-        render();
-    }
+    const res = await fetch(`/chat?q=${encodeURIComponent(userText)}&session_id=${sessionId}&token=${token}`);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -318,8 +293,6 @@ async function send(){
         if (done) break;
 
         const chunk = decoder.decode(value);
-
-        // 🔥 FIX: parse SSE properly
         const lines = chunk.split("\n");
 
         for (let line of lines) {
@@ -331,10 +304,15 @@ async function send(){
         }
     }
 
+    // ✅ Suggest next step
+    result += "\n\n---\n💡 *You can ask me more about this, or explore a related topic!*";
+
+    bot.innerHTML = marked.parse(result);
+
     chats[sessionId].messages[chats[sessionId].messages.length - 1].text = result;
 }
 
-document.getElementById("input").addEventListener("keydown", e => {
+input.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         send();
