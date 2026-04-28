@@ -26,7 +26,6 @@
 
         .main { flex:1; display:flex; flex-direction:column; }
 
-        /* 🔥 TOP BAR (LOGOUT HERE) */
         .topbar {
             display:flex;
             justify-content:space-between;
@@ -42,7 +41,7 @@
             overflow-y:auto;
         }
 
-        .row { display:flex; margin:8px 0; }
+        .row { display:flex; margin:10px 0; }
 
         .user { justify-content:flex-end; }
         .bot { justify-content:flex-start; }
@@ -50,17 +49,33 @@
         .msg {
             max-width:60%;
             padding:12px;
-            border-radius:10px;
+            border-radius:12px;
+            line-height:1.5;
         }
 
         .user .msg { background:#3b82f6; }
         .bot .msg { background:#444654; }
 
+        /* 🔥 CLEAN AVATARS */
         .avatar {
-            width:30px;
-            height:30px;
+            width:32px;
+            height:32px;
             border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:12px;
+            font-weight:bold;
             margin:0 8px;
+            flex-shrink:0;
+        }
+
+        .user .avatar {
+            background:#3b82f6;
+        }
+
+        .bot .avatar {
+            background:#10a37f;
         }
 
         .input-area {
@@ -79,6 +94,7 @@
 
         button {
             padding:8px 12px;
+            margin-left:5px;
             background:#10a37f;
             border:none;
             border-radius:6px;
@@ -106,7 +122,7 @@
 
 <body>
 
-<!-- 🔐 LOGIN -->
+<!-- LOGIN -->
 <div id="loginBox">
     <h3>Login</h3>
     <input id="username" placeholder="Username">
@@ -115,19 +131,15 @@
     <button onclick="register()">Register</button>
 </div>
 
-<!-- APP -->
 <div class="app" id="app" style="display:none;">
 
-    <!-- Sidebar -->
     <div class="sidebar">
         <button onclick="newChat()">+ New</button>
         <div id="list"></div>
     </div>
 
-    <!-- Main -->
     <div class="main">
 
-        <!-- 🔥 LOGOUT BAR -->
         <div class="topbar">
             <div>AI Chatbot</div>
             <button onclick="logout()">Logout</button>
@@ -159,7 +171,6 @@ function showLogin() {
 
 if (token) showChat();
 
-/* 🔥 LOGOUT FUNCTION */
 function logout() {
     localStorage.removeItem("token");
     token = null;
@@ -203,7 +214,7 @@ async function register() {
     alert(data.status || data.detail);
 }
 
-/* CHAT SYSTEM */
+/* CHAT */
 
 let chats = {};
 let sessionId = null;
@@ -246,11 +257,9 @@ function add(text, role, saveMsg=true){
     const row = document.createElement("div");
     row.className = "row " + role;
 
-    const avatar = document.createElement("img");
+    const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.src = role === "user"
-        ? "https://i.imgur.com/1Xq9BiP.png"
-        : "https://i.imgur.com/7k12EPD.png";
+    avatar.innerText = role === "user" ? "U" : "AI";
 
     const msg = document.createElement("div");
     msg.className = "msg";
@@ -280,12 +289,18 @@ async function send(){
 
     if (!sessionId) newChat();
 
-    add(input.value, "user");
+    const userText = input.value;
+
+    // 🔥 CLEAR INPUT + FOCUS HERE
+    input.value = "";
+    input.focus();
+
+    add(userText, "user");
     const bot = add("", "bot");
 
-    const url = `/chat?q=${encodeURIComponent(input.value)}&session_id=${sessionId}&token=${token}`;
-
-    const res = await fetch(url);
+    const res = await fetch(
+        `/chat?q=${encodeURIComponent(userText)}&session_id=${sessionId}&token=${token}`
+    );
 
     const title = res.headers.get("X-Chat-Title");
     if (title) {
@@ -302,23 +317,11 @@ async function send(){
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value);
-
-        // 🔥 SSE format parsing
-        const lines = chunk.split("\n");
-
-        for (let line of lines) {
-            if (line.startsWith("data: ")) {
-                const text = line.replace("data: ", "");
-                result += text;
-                bot.innerHTML = marked.parse(result);
-            }
-        }
+        result += decoder.decode(value);
+        bot.innerHTML = marked.parse(result);
     }
 
     chats[sessionId].messages[chats[sessionId].messages.length - 1].text = result;
-
-    input.value = "";
 }
 
 document.getElementById("input").addEventListener("keydown", e => {
