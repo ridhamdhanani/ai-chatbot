@@ -84,6 +84,7 @@ def chat(q: str, session_id: str, token: str):
 
     headers = {}
     if title:
-        headers["X-Chat-Title"] = title
+        safe_title = title.encode("ascii", "ignore").decode()
+        headers["X-Chat-Title"] = safe_title
 
     return StreamingResponse(generate(), media_type="text/plain", headers=headers)
