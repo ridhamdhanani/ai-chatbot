@@ -26,11 +26,14 @@
 
         .main { flex:1; display:flex; flex-direction:column; }
 
+        /* 🔥 TOP BAR (LOGOUT HERE) */
         .topbar {
             display:flex;
             justify-content:space-between;
+            align-items:center;
             padding:10px;
             background:#202123;
+            border-bottom:1px solid #333;
         }
 
         .chat-box {
@@ -67,16 +70,15 @@
         }
 
         input {
+            flex:1;
             padding:10px;
-            margin:5px;
             border:none;
-            border-radius:6px;
             outline:none;
+            border-radius:6px;
         }
 
         button {
-            padding:10px;
-            margin:5px;
+            padding:8px 12px;
             background:#10a37f;
             border:none;
             border-radius:6px;
@@ -95,12 +97,16 @@
             display:flex;
             flex-direction:column;
         }
+
+        #loginBox input {
+            margin-bottom:10px;
+        }
     </style>
 </head>
 
 <body>
 
-<!-- LOGIN -->
+<!-- 🔐 LOGIN -->
 <div id="loginBox">
     <h3>Login</h3>
     <input id="username" placeholder="Username">
@@ -109,16 +115,19 @@
     <button onclick="register()">Register</button>
 </div>
 
+<!-- APP -->
 <div class="app" id="app" style="display:none;">
 
+    <!-- Sidebar -->
     <div class="sidebar">
         <button onclick="newChat()">+ New</button>
         <div id="list"></div>
     </div>
 
+    <!-- Main -->
     <div class="main">
 
-        <!-- 🔥 NEW TOPBAR -->
+        <!-- 🔥 LOGOUT BAR -->
         <div class="topbar">
             <div>AI Chatbot</div>
             <button onclick="logout()">Logout</button>
@@ -150,11 +159,14 @@ function showLogin() {
 
 if (token) showChat();
 
+/* 🔥 LOGOUT FUNCTION */
 function logout() {
     localStorage.removeItem("token");
     token = null;
     showLogin();
 }
+
+/* AUTH */
 
 async function login() {
     const res = await fetch("/login", {
@@ -188,7 +200,7 @@ async function register() {
     });
 
     const data = await res.json();
-    alert(data.status);
+    alert(data.status || data.detail);
 }
 
 /* CHAT SYSTEM */
