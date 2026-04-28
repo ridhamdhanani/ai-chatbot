@@ -291,12 +291,12 @@ async function send(){
 
     const userText = input.value;
 
-    // 🔥 CLEAR INPUT + FOCUS HERE
     input.value = "";
     input.focus();
 
     add(userText, "user");
-    const bot = add("", "bot");
+
+    const bot = add('<div class="typing-text">Buddy is typing</div>', "bot");
 
     const res = await fetch(
         `/chat?q=${encodeURIComponent(userText)}&session_id=${sessionId}&token=${token}`
@@ -317,8 +317,18 @@ async function send(){
         const { done, value } = await reader.read();
         if (done) break;
 
-        result += decoder.decode(value);
-        bot.innerHTML = marked.parse(result);
+        const chunk = decoder.decode(value);
+
+        // 🔥 FIX: parse SSE properly
+        const lines = chunk.split("\n");
+
+        for (let line of lines) {
+            if (line.startsWith("data: ")) {
+                const text = line.replace("data: ", "");
+                result += text;
+                bot.innerHTML = marked.parse(result);
+            }
+        }
     }
 
     chats[sessionId].messages[chats[sessionId].messages.length - 1].text = result;
