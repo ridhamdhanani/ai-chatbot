@@ -26,6 +26,13 @@
 
         .main { flex:1; display:flex; flex-direction:column; }
 
+        .topbar {
+            display:flex;
+            justify-content:space-between;
+            padding:10px;
+            background:#202123;
+        }
+
         .chat-box {
             flex:1;
             padding:20px;
@@ -77,7 +84,6 @@
             cursor:pointer;
         }
 
-        /* LOGIN SCREEN */
         #loginBox {
             position:absolute;
             top:50%;
@@ -94,7 +100,7 @@
 
 <body>
 
-<!-- 🔐 LOGIN -->
+<!-- LOGIN -->
 <div id="loginBox">
     <h3>Login</h3>
     <input id="username" placeholder="Username">
@@ -105,14 +111,18 @@
 
 <div class="app" id="app" style="display:none;">
 
-    <!-- Sidebar -->
     <div class="sidebar">
         <button onclick="newChat()">+ New</button>
         <div id="list"></div>
     </div>
 
-    <!-- Main -->
     <div class="main">
+
+        <!-- 🔥 NEW TOPBAR -->
+        <div class="topbar">
+            <div>AI Chatbot</div>
+            <button onclick="logout()">Logout</button>
+        </div>
 
         <div id="chat" class="chat-box"></div>
 
@@ -133,7 +143,18 @@ function showChat() {
     document.getElementById("app").style.display = "flex";
 }
 
+function showLogin() {
+    document.getElementById("loginBox").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+}
+
 if (token) showChat();
+
+function logout() {
+    localStorage.removeItem("token");
+    token = null;
+    showLogin();
+}
 
 async function login() {
     const res = await fetch("/login", {
